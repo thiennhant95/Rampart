@@ -203,31 +203,21 @@ report is fully self-contained (no network needed) and works from `file://`.
 File links use `vscode://` deep links (require VS Code); set
 `html.repo_url` in the published config to get GitHub blob links instead.
 
-Three HTML audiences:
+### HTML reports: choose the file for the reader
 
-```bash
-php bin/quality-check . --format=html                          # full dev report
-php bin/quality-check . --format=html --no-remediation         # dev report, no fix guidance
-php bin/quality-check . --format=html --client                 # client report: findings only, trimmed chrome
-php bin/quality-check . --format=html --all-variants           # all three files in one run
-```
+The same scan can produce three HTML files. The flags do not remove findings
+or change the gate; they only change presentation. JSON and SARIF are always
+unchanged.
 
-`--all-variants` writes `quality-report.html`, `quality-report-findings.html`
-and `quality-report-client.html` side by side; machine formats (JSON/SARIF) are
-unchanged. A single `--no-remediation` run writes both `quality-report.html`
-(legacy filename) and `quality-report-findings.html`.
+| If the reader will ... | Add this flag | Open or send this file |
+|---|---|---|
+| Fix the issues | None; this is the default | `quality-report.html` |
+| Review the same technical report without fix boxes | `--no-remediation` | `quality-report-findings.html` |
+| Read a simplified external summary | `--client` | `quality-report-client.html` |
+| Compare or archive every presentation | `--all-variants` | All three files |
 
-`--client` keeps the decision sections (Summary, How to read, Fix now, Quality
-Score, Action Plan, findings, OWASP when present) and drops the engineering
-detail (Risk Overview, Delta, Top Rules, Per-Checker, Appendix). Branding comes
-from the published config:
-
-```php
-'html' => [
-    'client_brand' => 'RAMPART',   // your company/product name
-    'client_project' => null,      // defaults to the scanned directory name
-],
-```
+Details: [HTML reports](docs/reports.md). External handoffs:
+[Client reports](docs/client-reports.md).
 
 ### Standalone scan (no install in the target project)
 
@@ -270,19 +260,8 @@ php bin/quality-check /path/to/project --min-severity=error --fail-on=none --for
 php artisan quality:check --ci --baseline-file=baseline.json
 ```
 
-Two report modes: findings-only (where the problems are) vs findings plus
-how-to-fix guidance (current default). Clients get the first, developers
-the second:
-
-```bash
-# Findings only — no fix boxes, no remediation section
-php bin/quality-check /path/to/project --no-remediation --fail-on=none --format=html
-
-# Findings + fix (default) — or set remediation: false in config/quality-checker.php
-php bin/quality-check /path/to/project --fail-on=none --format=html
-```
-
-Machine reports (JSON/SARIF) always carry full data either way.
+Fix guidance is on by default. For findings-only commands, output filenames,
+and the client layout, see [HTML reports](docs/reports.md).
 
 ### Recommended rollout for an existing project
 
@@ -347,9 +326,9 @@ cache and does not modify the project either way.
 | `--profile` | both | Write `profile.json` (timers, parse amplification) next to the reports. Findings unchanged. | off |
 | `--help` | both | Print usage. Standalone prints its own list; Artisan uses Symfony Console's. | — |
 | `--ignore=...` | both | Skip these rules (comma-separated, e.g. `MISSING_MODEL_TEST`), merged with `quality_gate.ignore`. Dropped from reports, not just the gate. | — |
-| `--no-remediation` | both | Findings-only mode for human reports (console/HTML/Markdown hide fix guidance). JSON/SARIF keep full data. From config (`remediation`). | off |
-| `--client` | both | Client-facing HTML: findings only, trimmed chrome, relative paths; writes `quality-report-client.html`. | off |
-| `--all-variants` | both | With HTML: write `quality-report.html` (dev), `quality-report-findings.html` (no fix) and `quality-report-client.html` in one run. Other formats are unaffected. | off |
+| `--no-remediation` | both | Hide fix guidance in console, HTML, and Markdown reports. Findings, scores, and JSON/SARIF are unchanged. From config (`remediation`). | off |
+| `--client` | both | Simplified external HTML report. Writes only `quality-report-client.html`, with relative paths and no editor links. | off |
+| `--all-variants` | both | With HTML, write the full, findings-only, and client presentations in one run. Other formats are unaffected. | off |
 | `--coverage` | both | Opt into test-coverage checks for this run (missing-test findings are off by default). | off |
 | `--no-auto-install` | Artisan | Disable auto-installing missing tools (phpcs/phpstan/phpunit/trivy). Standalone never installs anything. | off |
 | `--fix` | Artisan | Auto-fix fixable issues (currently `phpcbf` only). Needs the target's vendor, so it is not offered in standalone. | off |
@@ -1001,6 +980,8 @@ composer validate --no-check-publish
 | Document | Read it when |
 |---|---|
 | [docs/index.md](docs/index.md) | You want the map of what exists and where the source of truth is. |
+| [docs/reports.md](docs/reports.md) | You need the developer, findings-only, or all-variants HTML files. |
+| [docs/client-reports.md](docs/client-reports.md) | You are sending a simplified report outside engineering. |
 | [docs/baseline.md](docs/baseline.md) | Your first run reports hundreds of pre-existing findings. |
 | [docs/false-positives.md](docs/false-positives.md) | A finding looks wrong, or you are choosing between fixing, suppressing and baselining. |
 | [UPGRADE.md](UPGRADE.md) | You are moving between versions — **read before re-baselining**. |
