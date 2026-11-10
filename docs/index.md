@@ -9,6 +9,8 @@ complete rule reference, CI recipes and troubleshooting.
 | Document | Read it when |
 |---|---|
 | [README](../README.md) | You are installing, configuring or wiring the gate into CI. |
+| [reports.md](reports.md) | You need to choose among the full, findings-only, or all-variants HTML files. |
+| [client-reports.md](client-reports.md) | You are sending a simplified report outside engineering. |
 | [baseline.md](baseline.md) | Your first run reports hundreds of pre-existing findings. |
 | [false-positives.md](false-positives.md) | A finding looks wrong, or you need to decide between fixing, suppressing and baselining it. |
 | [UPGRADE.md](../UPGRADE.md) | You are moving between versions. Read this **before** re-baselining. |
