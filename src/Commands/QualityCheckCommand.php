@@ -25,7 +25,7 @@ final class QualityCheckCommand extends Command
 {
     protected $signature = 'quality:check
         {--format=console : Comma-separated report formats: console,json,html,md,sarif or "all".}
-        {--only= : Only run these checkers (comma-separated): phpcs,phpstan,phpunit,composer_audit,trivy,custom.}
+        {--only= : Only run these checkers (comma-separated): phpcs,phpstan,phpunit,composer_audit,npm_audit,trivy,custom.}
         {--exclude= : Skip these checkers (comma-separated).}
         {--ignore= : Skip these rules (comma-separated, e.g. MISSING_MODEL_TEST).}
         {--path=* : Override scan paths (repeatable).}
