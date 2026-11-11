@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation (English / 日本語 / Tiếng Việt)
+    url: https://thiennhant95.github.io/Rampart/
+    about: Install, rules, reports, CI and troubleshooting.
+  - name: Security report
+    url: https://github.com/thiennhant95/Rampart/security/advisories/new
+    about: Report a vulnerability privately.

@@ -130,37 +130,18 @@ Analyzers inspect PHP source with `nikic/php-parser` and emit `Issue` objects.
 - Run `composer check` locally and make sure it passes before opening a PR.
 - Do not include unrelated refactors or dependency bumps.
 
-## Remotes and releases
+## Releases
 
-This repository has two remotes and both must stay in step:
-
-| Remote | Repository | Role |
-|---|---|---|
-| `origin` | `VietVang-JSC/vv-laravel-checker` | The project's working repository. |
-| `rampart` | `thiennhant95/Rampart` | **The distribution source Packagist tracks.** Tags here are what `composer require rampart/quality-checker` resolves. |
-
-`remote.pushDefault` is set to `rampart`, and a local alias pushes to both:
+`thiennhant95/Rampart` is the working and distribution repository. A tag pushed
+here is what Packagist resolves for `composer require rampart/quality-checker`.
 
 ```bash
-git pushall            # pushes to origin and rampart
-git pushall --tags     # pushes tags to both
+composer check                       # never tag a red build
+git push origin main
+git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
-Prefer `git pushall` over `git push`. A commit that reaches one remote but not
-the other is invisible until Packagist serves a release that does not exist
-locally.
-
-### Cutting a release
-
-```bash
-composer check                                   # never tag a red build
-git pushall --tags                               # if CI is green on both remotes
-```
-
-Packagist crawls the `rampart` remote, so a tag must exist **there** — a tag
-pushed only to `origin` produces a release nobody can install. Publish only the
-`0.x` tags: `v1.0.0` / `v1.1.0` are a dead line (see [UPGRADE.md](UPGRADE.md)) and
-are deliberately absent from the distribution remote.
+Publish only supported `0.x` tags; see [UPGRADE.md](UPGRADE.md).
 
 After tagging, confirm what Composer will actually resolve — the website's
 `.json` endpoint serves a stale cache, use the p2 endpoint instead:

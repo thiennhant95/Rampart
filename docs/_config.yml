@@ -1,0 +1,8 @@
+title: Rampart Quality Checker
+description: Laravel quality gate — phpcs, phpstan, phpunit, composer audit, security analyzers.
+theme: jekyll-theme-minimal
+baseurl: "/Rampart"
+url: "https://thiennhant95.github.io"
+markdown: kramdown
+show_downloads: false
+lang: en
