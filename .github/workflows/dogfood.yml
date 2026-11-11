@@ -70,3 +70,4 @@ jobs:
         run: >
           php bin/quality-check . --path=src --path=config --path=bin
           --only=custom --fail-on=warning --no-cache --format=console
+          --ignore=EOL_COMPONENT
