@@ -61,7 +61,7 @@ jobs:
       # build, whatever the runner image does with the path.
       - name: Cache composer dependencies
         continue-on-error: true
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('composer.json') }}
@@ -171,7 +171,7 @@ jobs:
       # repeat from cold.
       - name: Cache composer dependencies
         continue-on-error: true
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-composer-smoke

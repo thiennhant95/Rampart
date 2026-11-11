@@ -38,7 +38,7 @@ jobs:
       # continue-on-error: caching is an optimisation, never a gate.
       - name: Cache composer dependencies
         continue-on-error: true
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-composer-${{ hashFiles('composer.json') }}
