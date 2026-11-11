@@ -63,7 +63,7 @@ The package philosophy:
 | Requirement | Version |
 |---|---|
 | PHP | `^8.1` |
-| Laravel | `9`, `10`, `11`, `12` (`illuminate/console` & `illuminate/support` `^9.0|^10.0|^11.0|^12.0`) |
+| Laravel | `9`, `10`, `11`, `12`, `13` (`illuminate/console` & `illuminate/support` `^9.0|^10.0|^11.0|^12.0|^13.0`) |
 | Composer | `2.4+` (for `composer audit`) |
 
 Optional tools (skipped with a hint if missing): `squizlabs/php_codesniffer`,
@@ -73,7 +73,7 @@ Optional tools (skipped with a hint if missing): `squizlabs/php_codesniffer`,
 
 ## Installation
 
-Requirements: PHP `^8.1`, Laravel `9|10|11|12`, and Composer `2.4+`.
+Requirements: PHP `^8.1`, Laravel `9|10|11|12|13`, and Composer `2.4+`.
 
 ```bash
 composer require rampart/quality-checker
@@ -139,7 +139,7 @@ Two entry points, because the situations they serve are genuinely different.
 | Needs a bootable Laravel app | yes | no — static sources only |
 | Config source | published `config/quality-checker.php` | the tool's own config, plus CLI flags |
 | Default scan scope | `paths` from config (`app`, `routes`, `database`, `config`, `tests`) | `app src routes config database tests resources packages` found in the target |
-| Default checkers | all six | **`custom` only** — the wrapped tools need the target's own vendor |
+| Default checkers | all seven | **`custom` only** — the wrapped tools need the target's own vendor |
 | Reports go to | `base_path()/reports/quality-checker` | `<target>/reports/quality-checker` |
 | Report version stamp | resolved package version | resolved package version (identical) |
 
@@ -388,6 +388,7 @@ scan everything.
 | `phpstan` | `vendor/bin/phpstan` | Static analysis (default level `5`). |
 | `phpunit` | `vendor/bin/phpunit` | Test suite, failures become issues. Also parses Clover coverage and flags `PHPUNIT_LOW_COVERAGE` when below `phpunit.coverageThreshold` (default 60%). |
 | `composer_audit` | `composer audit` | Dependency security advisories. |
+| `npm_audit` | `npm audit --json` | npm dependency vulnerabilities (skipped without `package.json` or `npm`). |
 | `trivy` | `trivy fs` / `trivy config` | Optional filesystem/IaC security scan (disabled by default). |
 | `custom` | PHP-Parser AST | Custom analyzers: security, test coverage, conventions. |
 
@@ -398,7 +399,7 @@ When an optional tool is not installed, the corresponding checker reports
 
 ## Custom Analyzer Rules
 
-43 rule ids across 5 groups. Every row below is verified against
+50 rule ids. Every row below is verified against
 `src/Result/RuleIds.php` by `RuleDocsTest`, so this table cannot drift from what
 the analyzers actually emit — an id that does not exist, or a rule that ships
 undocumented, fails the build.
@@ -513,7 +514,7 @@ low-confidence hints. The last two are opt-in.
 
 These are not rule ids — they are the third-party tools this package drives, and
 their findings appear in reports under the `phpcs`, `phpstan`, `phpunit`,
-`composer_audit` and `trivy` sources:
+`composer_audit`, `npm_audit` and `trivy` sources:
 
 | Checker | What it gates |
 |---|---|
@@ -521,6 +522,7 @@ their findings appear in reports under the `phpcs`, `phpstan`, `phpunit`,
 | `phpstan` | Static type analysis at the configured level (default 5). |
 | `phpunit` | Test suite result, plus the configured coverage threshold. |
 | `composer_audit` | Known CVEs in the dependency tree. |
+| `npm_audit` | Known advisories in `package.json` dependencies (skipped without `package.json` or `npm`). |
 | `trivy` | Optional filesystem/config scan (off by default). |
 ### Confidence & Tiering
 

@@ -92,7 +92,7 @@ return [
             'taint_engine' => false,
         ],
 
-        // OWASP Top 10 (2023) API mapping — high confidence.
+        // OWASP Top 10 (2021) API mapping — high confidence.
         'owasp' => [
             'broken_access_control' => true,
             // Resolve route-middleware authorization (Route::middleware('can:...'),

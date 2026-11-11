@@ -394,7 +394,7 @@ final class StandaloneRunner
     {
         $output->writeln('Usage: php bin/quality-check <target-dir> [options]');
         $output->writeln('  --format=console|json|html|md|sarif|all (default: console)');
-        $output->writeln('  --tier=security|quality|all  --only=custom,...  --exclude=...');
+        $output->writeln('  --tier=security|quality|all  --only=custom,npm_audit,...  --exclude=...');
         $output->writeln('  --fail-on=none|info|warning|error|critical  --min-confidence=low|medium|high');
         $output->writeln('  --min-severity=info|warning|error|critical  hide lighter findings from reports');
         $output->writeln('  --output=<dir>  --path=<sub> (repeatable)  --no-cache  --profile');

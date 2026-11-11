@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `--only` help on both entry points now lists `npm_audit` (the checker
+  already existed in `CheckRunner`, it was only missing from the help text).
+- Docs drift: default checkers "six" → "seven", Laravel `9–12` → `9–13`
+  (matches `composer.json`), "43 rule ids" → "50", OWASP mapping comment
+  "(2023)" → "(2021)", `docs/overview.md` test count and latest version.
+
+### Security
+
+- Patch-level Symfony upgrades (`http-foundation`, `http-kernel`, `routing`
+  `7.4.20→7.4.23`, `mime` `7.4.19→7.4.22`): `composer audit --no-dev` is
+  clean (was 7 advisories across 4 packages). No behavior changes.
+
 ## [1.6.0] - 2026-11-03
 
 ### Added
