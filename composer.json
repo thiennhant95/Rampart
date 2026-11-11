@@ -8,7 +8,7 @@
     "support": {
         "issues": "https://github.com/thiennhant95/Rampart/issues",
         "source": "https://github.com/thiennhant95/Rampart",
-        "docs": "https://github.com/thiennhant95/Rampart#readme"
+        "docs": "https://thiennhant95.github.io/Rampart/"
     },
     "bin": [
         "bin/quality-check"

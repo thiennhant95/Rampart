@@ -4,7 +4,8 @@
 
 [![Packagist Version](https://img.shields.io/packagist/v/rampart/quality-checker)](https://packagist.org/packages/rampart/quality-checker)
 [![Packagist Downloads](https://img.shields.io/packagist/dt/rampart/quality-checker)](https://packagist.org/packages/rampart/quality-checker)
-[![CI](https://github.com/VietVang-JSC/vv-laravel-checker/actions/workflows/ci.yml/badge.svg)](https://github.com/VietVang-JSC/vv-laravel-checker/actions/workflows/ci.yml)
+[![CI](https://github.com/thiennhant95/Rampart/actions/workflows/ci.yml/badge.svg)](https://github.com/thiennhant95/Rampart/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-EN%20%7C%20JA%20%7C%20VI-blue)](https://thiennhant95.github.io/Rampart/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![PHP ^8.1](https://img.shields.io/badge/PHP-%5E8.1-777BB4.svg)](composer.json)
 
@@ -19,6 +20,20 @@ tests** and **code conventions** — all with machine-readable reports and
 standardised exit codes for CI.
 
 </div>
+
+---
+
+## Rampart family
+
+| Project | Focus | Repository | Documentation |
+|---|---|---|---|
+| **Rampart** | Laravel Artisan quality gate | [thiennhant95/Rampart](https://github.com/thiennhant95/Rampart) | [Pages](https://thiennhant95.github.io/Rampart/) |
+| **Rampart PHP** | Plain PHP + frameworks, PHP 7.4+ | [thiennhant95/Rampart-PHP](https://github.com/thiennhant95/Rampart-PHP) | [Pages](https://thiennhant95.github.io/Rampart-PHP/) |
+| **Rampart WP** | WordPress plugins/themes | [thiennhant95/Rampart-Wordpress](https://github.com/thiennhant95/Rampart-Wordpress) | [Pages](https://thiennhant95.github.io/Rampart-Wordpress/) |
+
+Full documentation: **[English](https://thiennhant95.github.io/Rampart/en/)** ·
+**[日本語](https://thiennhant95.github.io/Rampart/ja/)** ·
+**[Tiếng Việt](https://thiennhant95.github.io/Rampart/vi/)**
 
 ---
 

@@ -793,9 +793,8 @@ and its documentation is verified by the build.
   deductions use the same weights.
 
 ### Changed (rebrand)
-- Renamed package `vietvang/quality-checker` → `rampart/laravel-checker` and
-  namespace `VietVang\QualityChecker` → `Rampart\QualityChecker` (all sources,
-  tests, docs, SARIF links). Locked LF line endings via `.gitattributes`.
+- Renamed the package and namespace to Rampart across all sources, tests, docs
+  and SARIF links. Locked LF line endings via `.gitattributes`.
 
 ### Changed (source hygiene)
 - PHPStan 1.12 (EOL) → 2.0; `treatPhpDocTypesAsCertain: false` (finder
