@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-13
+
+### Added
+
+- Real security-scan screenshot in the README and the EN/JA/VI docs pages.
+
 ### Fixed
 
 - `--only` help on both entry points now lists `npm_audit` (the checker
