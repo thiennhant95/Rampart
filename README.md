@@ -12,6 +12,8 @@
 **A comprehensive quality gate for Laravel** —
 _A comprehensive Laravel quality gate._
 
+![Rampart security tier scan: checker table, top rules and issues](docs/assets/rampart-main.png)
+
 ![HTML report: How-to-read, Fix now, severity filters](docs/shot-report.png)
 
 Wraps `phpcs`, `phpstan`, `phpunit`, `composer audit` and `trivy` into a single

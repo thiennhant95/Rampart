@@ -1,4 +1,4 @@
----
+﻿---
 layout: default
 title: Rampart Quality Checker — 日本語
 description: Laravel 向け品質ゲートの日本語ドキュメント。
@@ -11,6 +11,8 @@ description: Laravel 向け品質ゲートの日本語ドキュメント。
 **Laravel 9–13** / **PHP 8.1+** 向けの総合品質ゲート。1 つの Artisan コマンドで
 phpcs、phpstan、phpunit、composer audit、trivy を実行し、50 個の PHP-Parser
 ルールでセキュリティ・テスト不足・規約を検査します。
+
+![Rampart security tier scan](../assets/rampart-main.png)
 
 ## Rampart ファミリー
 

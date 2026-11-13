@@ -1,4 +1,4 @@
----
+﻿---
 layout: default
 title: Rampart Quality Checker — Tiếng Việt
 description: Tài liệu tiếng Việt cho quality gate Laravel.
@@ -10,6 +10,8 @@ description: Tài liệu tiếng Việt cho quality gate Laravel.
 
 Quality gate toàn diện cho **Laravel 9–13** trên **PHP 8.1+**. Một lệnh Artisan
 chạy toàn bộ pipeline và trả exit code chuẩn cho CI.
+
+![Rampart security tier scan](../assets/rampart-main.png)
 
 ## Hệ sinh thái Rampart
 

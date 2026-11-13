@@ -11,6 +11,8 @@ description: Full English documentation for the Laravel quality gate.
 A comprehensive quality gate for **Laravel 9–13** on **PHP 8.1+**. One Artisan
 command runs the whole pipeline and returns a CI-ready exit code.
 
+![Rampart security tier scan](../assets/rampart-main.png)
+
 ## The Rampart family
 
 | Project | Focus | Repository | Documentation |
