@@ -94,7 +94,13 @@ final class ConsoleReporter implements ReporterInterface
         ));
 
         $this->output->writeln('');
-        if ($ctx->exitCode === 0) {
+        if (($summary['failed'] ?? 0) > 0 && $ctx->exitCode === 0) {
+            $this->output->writeln(sprintf(
+                '<fg=yellow>⚠ %d checker(s) reported findings — within the --fail-on threshold, exit code 0.</>',
+                $summary['failed']
+            ));
+            $this->output->writeln('<fg=gray>Tip: raise the tier or --fail-on level to turn these findings into a failing build.</>');
+        } elseif ($ctx->exitCode === 0) {
             $this->output->writeln('<fg=green>✔ All checks passed.</>');
         } else {
             $this->output->writeln('<fg=red>✘ Quality gate not met. Exit code: ' . $ctx->exitCode . '</>');
