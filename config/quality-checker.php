@@ -149,10 +149,11 @@ return [
             'blade_stack' => true,
         ],
 
-        // Ops checks (checkpoint parity) — perms, EOL.
+        // Ops checks (checkpoint parity) — perms, EOL, composer manifest.
         'ops' => [
             'perms' => true,
             'eol' => true,
+            'composer' => true,
         ],
 
         // Eloquent model directories for mass-assignment resolution.

@@ -79,6 +79,8 @@ final class RuleIds
     // --- Ops checks (checkpoint parity) ---------------------------------
     public const PERMS_TOO_OPEN = 'PERMS_TOO_OPEN';
     public const EOL_COMPONENT = 'EOL_COMPONENT';
+    public const MISSING_COMPOSER = 'MISSING_COMPOSER';
+    public const INVALID_CONSTRAINT = 'INVALID_CONSTRAINT';
     public const ROGUE_PHP = 'ROGUE_PHP';
     public const OBFUSCATED_PHP = 'OBFUSCATED_PHP';
 
@@ -129,6 +131,8 @@ final class RuleIds
             self::BLADE_STACK_MISMATCH,
             self::PERMS_TOO_OPEN,
             self::EOL_COMPONENT,
+            self::MISSING_COMPOSER,
+            self::INVALID_CONSTRAINT,
             self::ROGUE_PHP,
             self::OBFUSCATED_PHP,
             self::DEAD_CODE,

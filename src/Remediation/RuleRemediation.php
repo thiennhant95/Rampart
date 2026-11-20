@@ -552,16 +552,17 @@ final class RuleRemediation
                 'docs' => null,
             ],
             'PERMS_TOO_OPEN' => [
-                'why' => 'File or directory is world-writable (777/666) — deploy artifact leaks or is mutable by any local user.',
+                'why' => 'A sensitive file/dir (.env, storage, bootstrap/cache) is writable by other users: world-write is Critical, group-write alone is Warning.',
                 'fix' => <<<'CODE'
-                    chmod 755 app/ storage/ bootstrap/cache/
-                    chmod 644 app/**/*.php
-                    # .gitignore vendor/ and never deploy with 777
+                    chmod 600 .env          # or 640 if the web server needs group read
+                    chmod 755 storage/ bootstrap/cache/
+                    chmod 644 storage/**/*.php   # regular files stay 644
+                    # Never deploy with 777; .gitignore vendor/
                     CODE,
                 'docs' => null,
             ],
             'EOL_COMPONENT' => [
-                'why' => 'Framework or PHP version is end-of-life — no security patches.',
+                'why' => 'Framework or PHP version is end-of-life — no security patches. Versions older than the tracked range are reported with a generic message because the exact EOL date is no longer relevant.',
                 'fix' => <<<'CODE'
                     # Check https://endoflife.date/laravel and https://endoflife.date/php
                     composer update illuminate/* --with-dependencies
@@ -569,8 +570,28 @@ final class RuleRemediation
                     CODE,
                 'docs' => null,
             ],
+            'MISSING_COMPOSER' => [
+                'why' => 'A Laravel project has no composer.json, so its dependency versions are not reproducible and cannot be audited.',
+                'fix' => <<<'CODE'
+                    # Restore the manifest from version control
+                    git checkout -- composer.json composer.lock
+                    composer install
+                    CODE,
+                'docs' => null,
+            ],
+            'INVALID_CONSTRAINT' => [
+                'why' => 'composer.json is unparseable (bad JSON / non-object require) or a php/laravel/framework constraint is not a version string, so dependency and EOL checks cannot run.',
+                'fix' => <<<'CODE'
+                    // WRONG
+                    "require": { "php": ["8.1"], "laravel/framework": true }
+
+                    // RIGHT
+                    "require": { "php": "^8.3", "laravel/framework": "^12.0" }
+                    CODE,
+                'docs' => null,
+            ],
             'ROGUE_PHP' => [
-                'why' => 'Unexpected PHP file in public/ or upload dir — possible webshell or dropper.',
+                'why' => 'Unexpected PHP file in public/ — almost always a webshell or dropper. Files matching obfuscation/code-exec payloads are Critical; otherwise the finding stays a Warning for the convention violation.',
                 'fix' => <<<'CODE'
                     # Remove it, audit git history, and re-deploy from clean artifact:
                     git log --all -- public/

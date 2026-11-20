@@ -74,30 +74,36 @@ final class EolAnalyzer implements ScanContextAware
         $issues = [];
         $laravel = $requires['laravel/framework'] ?? null;
         if (is_string($laravel)) {
+            $laravelFloor = min(array_keys(self::LARAVEL_EOL));
             foreach ($this->eolLaravelMajors($laravel) as $major => $eol) {
                 $issues[] = new Issue(
                     self::RULE,
-                    sprintf('laravel/framework %s is end-of-life since %s — upgrade.', $laravel, $eol),
+                    $eol === ''
+                        ? sprintf('laravel/framework %s is end-of-life (older than %d.x) — upgrade.', $laravel, $laravelFloor)
+                        : sprintf('laravel/framework %s is end-of-life since %s — upgrade.', $laravel, $eol),
                     $composer,
                     1,
                     Severity::Warning,
                     'custom',
-                    ['package' => 'laravel/framework', 'constraint' => $laravel, 'major' => $major, 'eol' => $eol],
+                    ['package' => 'laravel/framework', 'constraint' => $laravel, 'major' => $major, 'eol' => $eol === '' ? null : $eol, 'below_supported' => $eol === ''],
                     Confidence::Medium
                 );
             }
         }
         $php = $requires['php'] ?? null;
         if (is_string($php)) {
+            $phpFloor = min(array_keys(self::PHP_EOL));
             foreach ($this->eolPhpLines($php) as $line => $eol) {
                 $issues[] = new Issue(
                     self::RULE,
-                    sprintf('php %s is end-of-life since %s — upgrade.', $php, $eol),
+                    $eol === ''
+                        ? sprintf('php %s is end-of-life (older than %s) — upgrade.', $php, $phpFloor)
+                        : sprintf('php %s is end-of-life since %s — upgrade.', $php, $eol),
                     $composer,
                     1,
                     Severity::Warning,
                     'custom',
-                    ['package' => 'php', 'constraint' => $php, 'line' => $line, 'eol' => $eol],
+                    ['package' => 'php', 'constraint' => $php, 'line' => $line, 'eol' => $eol === '' ? null : $eol, 'below_supported' => $eol === ''],
                     Confidence::Medium
                 );
             }
@@ -112,17 +118,25 @@ final class EolAnalyzer implements ScanContextAware
      * A constraint allowing ANY supported major (e.g. `^11.0|^12.0`) does not
      * fire: the project can resolve to a live line. Only fire when every
      * major mentioned is EOL (single-major pins like `^11.0` are the norm).
-     * Constraints with no parseable major never fire (unknown, not EOL).
+     * Majors older than the lowest tracked line (Laravel 8 and below) are EOL
+     * too, but without a reliable date — they are reported with a generic
+     * "older than X.x" message (empty date sentinel). Majors newer than the
+     * highest tracked line are treated as supported (unknown, not EOL).
      *
-     * @return array<int, string> major => eol date
+     * @return array<int, string> major => eol date ('' when below the tracked map)
      */
     private function eolLaravelMajors(string $constraint): array
     {
+        if (preg_match('/>=/', $constraint)) {
+            // Open floor (`>=9.0`, `>=8.1`) allows any newer (supported)
+            // line, so the project is not pinned to an EOL major.
+            return [];
+        }
         preg_match_all('/\b(\d{1,2})(?:\.\d+){0,2}\b/', $constraint, $m);
         $majors = [];
         foreach ($m[1] as $raw) {
             $major = (int) $raw;
-            if ($major >= 6 && $major <= 20) {
+            if ($major >= 1) {
                 $majors[$major] = true;
             }
         }
@@ -130,11 +144,22 @@ final class EolAnalyzer implements ScanContextAware
             return [];
         }
         $now = time();
+        $floor = min(array_keys(self::LARAVEL_EOL));
+        $ceiling = max(array_keys(self::LARAVEL_EOL));
         $eol = [];
         foreach (array_keys($majors) as $major) {
+            if ($major > $ceiling) {
+                // Future release: treat as supported rather than guess.
+                return [];
+            }
             $date = self::LARAVEL_EOL[$major] ?? null;
             if ($date === null) {
-                // Unknown major (future release): treat as supported.
+                if ($major < $floor) {
+                    $eol[$major] = '';
+                    continue;
+                }
+
+                // A gap inside the tracked range is unknown, not EOL.
                 return [];
             }
             if (strtotime($date) >= $now) {
@@ -153,24 +178,39 @@ final class EolAnalyzer implements ScanContextAware
      * Same any-supported-wins rule as Laravel. `>=8.1` style open ranges
      * mention a floor but allow newer lines, so they never fire — only
      * exact pins (`8.1.*`, `~8.1.0`, `^8.1`) and closed sets of EOL lines do.
+     * Lines older than the lowest tracked line (PHP 7.x and below) are EOL
+     * with a generic message; lines newer than the highest tracked line are
+     * treated as supported.
      *
-     * @return array<string, string> line => eol date
+     * @return array<string, string> line => eol date ('' when below the tracked map)
      */
     private function eolPhpLines(string $constraint): array
     {
         if (preg_match('/>=/', $constraint)) {
             return [];
         }
-        preg_match_all('/\b(8\.\d|7\.\d)\b/', $constraint, $m);
+        preg_match_all('/\b(\d+\.\d+)\b/', $constraint, $m);
         $lines = array_unique($m[1]);
         if ($lines === []) {
             return [];
         }
         $now = time();
+        $floor = min(array_keys(self::PHP_EOL));
+        $ceiling = max(array_keys(self::PHP_EOL));
         $eol = [];
         foreach ($lines as $line) {
+            if (version_compare($line, $ceiling, '>')) {
+                // Future line: treat as supported rather than guess.
+                return [];
+            }
             $date = self::PHP_EOL[$line] ?? null;
             if ($date === null) {
+                if (version_compare($line, $floor, '<')) {
+                    $eol[$line] = '';
+                    continue;
+                }
+
+                // A gap inside the tracked range is unknown, not EOL.
                 return [];
             }
             if (strtotime($date) >= $now) {

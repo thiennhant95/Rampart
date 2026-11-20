@@ -43,15 +43,30 @@ final class RoguePhpAnalyzer implements ScanContextAware
             if ($name === 'index.php') {
                 continue;
             }
+            $path = $file->getPathname();
+            // An unexpected PHP file in public/ is always a finding, but only
+            // content that matches the same payload evidence as
+            // OBFUSCATED_PHP/UNSAFE_EVAL is treated as a probable webshell.
+            // A file that is merely out of place stays visible as Warning so
+            // the convention violation is not lost.
+            $payload = PhpPayloadPatterns::dangerous($this->sharedSource($path));
+            $metadata = [
+                'file' => $name,
+                'reason' => 'unexpected_php_in_public',
+                'classification' => $payload !== null ? 'dangerous' : 'benign',
+            ];
+            if ($payload !== null) {
+                $metadata['matched_pattern'] = $payload['label'];
+            }
             $issues[] = new Issue(
                 self::RULE,
-                sprintf('Rogue PHP file in public/: %s — only index.php should be there.', $file->getPathname()),
-                $file->getPathname(),
+                sprintf('Rogue PHP file in public/: %s — only index.php should be there.', $path),
+                $path,
                 1,
-                Severity::Critical,
+                $payload !== null ? Severity::Critical : Severity::Warning,
                 'custom',
-                ['file' => $file->getFilename()],
-                Confidence::High
+                $metadata,
+                $payload !== null ? Confidence::High : Confidence::Medium
             );
         }
 

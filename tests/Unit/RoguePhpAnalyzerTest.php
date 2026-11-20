@@ -49,13 +49,34 @@ final class RoguePhpAnalyzerTest extends TestCase
         return $path;
     }
 
-    public function testFlagsRoguePhpInPublic(): void
+    public function testFlagsBenignRoguePhpAsWarning(): void
     {
         $this->file('public/shell.php');
         $issues = $this->analyzer($this->tmp)->analyze([]);
         self::assertCount(1, $issues);
         self::assertSame('ROGUE_PHP', $issues[0]->rule);
+        self::assertSame(Severity::Warning, $issues[0]->severity);
+        self::assertSame('benign', $issues[0]->metadata['classification']);
+        self::assertArrayNotHasKey('matched_pattern', $issues[0]->metadata);
+    }
+
+    public function testRoguePhpWithPayloadIsCritical(): void
+    {
+        $this->file('public/shell.php', "<?php\neval(base64_decode(\$_POST['x']));\n");
+        $issues = $this->analyzer($this->tmp)->analyze([]);
+        self::assertCount(1, $issues);
         self::assertSame(Severity::Critical, $issues[0]->severity);
+        self::assertSame('dangerous', $issues[0]->metadata['classification']);
+        self::assertSame('eval(base64_decode(...))', $issues[0]->metadata['matched_pattern']);
+    }
+
+    public function testRoguePhpWithDangerousCallIsCritical(): void
+    {
+        $this->file('public/tool.php', "<?php\nsystem(\$_GET['cmd']);\n");
+        $issues = $this->analyzer($this->tmp)->analyze([]);
+        self::assertCount(1, $issues);
+        self::assertSame(Severity::Critical, $issues[0]->severity);
+        self::assertSame('dangerous', $issues[0]->metadata['classification']);
     }
 
     public function testIgnoresIndexPhpAndNonPhp(): void

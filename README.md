@@ -517,14 +517,16 @@ low-confidence hints. The last two are opt-in.
 
 | Rule ID | Severity | Confidence | What it detects |
 |---|---|---|---|
-| `PERMS_TOO_OPEN` | Warning | medium | File/dir is world-writable (`777`/`666`) — `.env`, `storage`, `bootstrap/cache`. |
-| `EOL_COMPONENT` | Warning | medium | `laravel/framework` or `php` constraint is EOL — no security patches. |
+| `PERMS_TOO_OPEN` | Critical/Warning | high/medium | Sensitive path (`.env`, `storage`, `bootstrap/cache`) is world-writable (`o+w`, Critical) or group-writable (`g+w`, Warning). Compared by bits, not an exact octal string. |
+| `EOL_COMPONENT` | Warning | medium | `laravel/framework` or `php` constraint is EOL — including versions older than the tracked map, reported with a generic message. |
+| `MISSING_COMPOSER` | Warning | high | A Laravel project (≥2 root signals) has no `composer.json` — deps are not reproducible. |
+| `INVALID_CONSTRAINT` | Error | high | `composer.json` is unparseable or a `php`/`laravel/framework` constraint is not a version string. |
 
 ### Forensics (`analyzers/security`, on by default)
 
 | Rule ID | Severity | Confidence | What it detects |
 |---|---|---|---|
-| `ROGUE_PHP` | Critical | high | Unexpected PHP file in `public/` (only `index.php` should be there). |
+| `ROGUE_PHP` | Critical/Warning | high/medium | Unexpected PHP file in `public/` (only `index.php` should be there). Critical when it matches obfuscation/code-exec payloads; Warning otherwise. |
 | `OBFUSCATED_PHP` | Critical | medium | Obfuscated `eval(base64_decode`, `gzinflate`, `str_rot13`, `chr().chr()`, `\\x..`. |
 
 ### Wrapped checkers

@@ -11,6 +11,7 @@ use Rampart\QualityChecker\Analyzers\Convention\TodoFixmeAnalyzer;
 use Rampart\QualityChecker\Analyzers\Frontend\BladeStackAnalyzer;
 use Rampart\QualityChecker\Analyzers\Frontend\CssSyntaxAnalyzer;
 use Rampart\QualityChecker\Analyzers\Frontend\JsSyntaxAnalyzer;
+use Rampart\QualityChecker\Analyzers\Ops\ComposerManifestAnalyzer;
 use Rampart\QualityChecker\Analyzers\Ops\EolAnalyzer;
 use Rampart\QualityChecker\Analyzers\Ops\PermsAnalyzer;
 use Rampart\QualityChecker\Analyzers\Security\ObfuscatedAnalyzer;
@@ -407,6 +408,7 @@ final class CustomAnalyzerChecker implements CheckerInterface
             $this->entry($analyzers, 'frontend.blade_stack', new BladeStackAnalyzer()),
             $this->entry($analyzers, 'ops.perms', new PermsAnalyzer()),
             $this->entry($analyzers, 'ops.eol', new EolAnalyzer()),
+            $this->entry($analyzers, 'ops.composer', new ComposerManifestAnalyzer()),
             $this->entry($analyzers, 'security.rogue_php', new RoguePhpAnalyzer()),
             $this->entry($analyzers, 'security.obfuscated', new ObfuscatedAnalyzer()),
         ];
