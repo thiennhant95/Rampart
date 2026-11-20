@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-20
+
+### Added
+
+- `MISSING_COMPOSER` and `INVALID_CONSTRAINT`: a Laravel project (≥2 root
+  signals) with no `composer.json`, or a manifest that is unparseable / carries
+  a non-string `php` or `laravel/framework` constraint. Version support stays
+  under `EOL_COMPONENT`.
+- Shared `PhpPayloadPatterns` detector backing `OBFUSCATED_PHP` and the
+  rogue-file grading (token-aware, string/comment stripping, hex density).
+
+### Changed
+
+- `ROGUE_PHP` grades by content: obfuscation/code-execution evidence →
+  Critical with `metadata.matched_pattern`; an otherwise benign misplaced file
+  → Warning (the convention violation is still reported).
+- `PERMS_TOO_OPEN` compares permission bits instead of a hardcoded octal list:
+  other-write → Critical, group-write → Warning; file/dir-specific fix hints;
+  `.env` at the usual 644 is silent; `storage/framework` and `storage/logs` are
+  whitelisted.
+- `EOL_COMPONENT` reports lines older than the tracked map with a generic
+  "older than X" message (no invented date), and stays silent for open ranges
+  (`>=`) and any supported line.
+
 ### Fixed
 
 - Console output no longer claims `✔ All checks passed.` when checkers reported findings within the `--fail-on` threshold — it now says so explicitly.
