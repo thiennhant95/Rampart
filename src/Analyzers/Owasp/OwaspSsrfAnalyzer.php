@@ -764,6 +764,12 @@ final class OwaspSsrfAnalyzer extends AbstractAnalyzer
         }
 
         if ($expr instanceof Node\Expr\BinaryOp\Concat) {
+            // A path rooted at __DIR__/__FILE__/dirname() can never become a
+            // remote URL, whatever dynamic suffix is appended.
+            if ($this->isLocalPathBase($expr->left)) {
+                return true;
+            }
+
             return $this->isLocalPathOperand($expr->left) && $this->isLocalPathOperand($expr->right);
         }
 
@@ -783,6 +789,25 @@ final class OwaspSsrfAnalyzer extends AbstractAnalyzer
     private function isLocalPathOperand(Node\Expr $expr): bool
     {
         return $expr instanceof Node\Scalar\String_ || $this->isLocalPath($expr);
+    }
+
+    private function isLocalPathBase(Node\Expr $expr): bool
+    {
+        if ($expr instanceof Node\Scalar\MagicConst) {
+            return true;
+        }
+        if (
+            $expr instanceof Node\Expr\FuncCall
+            && $expr->name instanceof Node\Name
+            && in_array(strtolower($expr->name->toString()), ['dirname', 'realpath', 'basename'], true)
+        ) {
+            return true;
+        }
+        if ($expr instanceof Node\Expr\BinaryOp\Concat) {
+            return $this->isLocalPathBase($expr->left);
+        }
+
+        return false;
     }
 
     private function isLiteralString(Node\Expr $expr): bool

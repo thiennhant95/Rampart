@@ -3,6 +3,34 @@
 
 declare(strict_types=1);
 
+// The canonical AST cache can exceed PHP's default 128M on a few hundred
+// files. Raise the CLI floor; an explicit php.ini limit above 512M is left
+// untouched.
+$memoryLimit = (string) ini_get('memory_limit');
+$toBytes = static function (string $value): int {
+    $value = trim($value);
+    if ($value === '' || $value === '-1') {
+        return -1;
+    }
+    $unit = strtolower(substr($value, -1));
+    $number = (int) $value;
+    if ($unit === 'g') {
+        return $number * 1024 * 1024 * 1024;
+    }
+    if ($unit === 'm') {
+        return $number * 1024 * 1024;
+    }
+    if ($unit === 'k') {
+        return $number * 1024;
+    }
+
+    return $number;
+};
+$currentMemory = $toBytes($memoryLimit);
+if ($currentMemory !== -1 && $currentMemory < 512 * 1024 * 1024) {
+    @ini_set('memory_limit', '512M');
+}
+
 // Standalone scan: no composer install in the target project needed.
 // Usage: php bin/quality-check <target-dir> [--format=all] [options]
 

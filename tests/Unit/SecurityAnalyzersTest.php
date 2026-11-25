@@ -330,6 +330,41 @@ final class SecurityAnalyzersTest extends TestCase
         self::assertTrue($this->ruleMatches($issues[0], 'UNSAFE_EVAL', Severity::Critical));
     }
 
+    public function testUnsafeEvalSkipsIsCallableGuardedCallback(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nclass ActionService {\n    public function run(array \$config): void {\n" .
+            "        if (isset(\$config['cb']) && is_callable(\$config['cb'] ?? null)) {\n" .
+            "            call_user_func(\$config['cb']);\n        }\n    }\n}\n",
+            'app/Services/ActionService.php'
+        );
+
+        self::assertCount(0, (new UnsafeEvalAnalyzer())->analyze([$file]));
+    }
+
+    public function testUnsafeEvalSkipsClosureInstanceofGuard(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nclass ActionService {\n    /** @var callable */\n    protected \$fields = [];\n" .
+            "    public function run(string \$key): void {\n" .
+            "        if (\$this->fields[\$key] instanceof \\Closure) {\n" .
+            "            call_user_func(\$this->fields[\$key]);\n        }\n    }\n}\n",
+            'app/Services/ActionService.php'
+        );
+
+        self::assertCount(0, (new UnsafeEvalAnalyzer())->analyze([$file]));
+    }
+
+    public function testUnsafeEvalSkipsTestPaths(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nclass RunnerTest {\n    public function run(string \$code): void {\n        \$fn = 'assert';\n        \$fn(\$code);\n    }\n}\n",
+            'tests/Unit/RunnerTest.php'
+        );
+
+        self::assertCount(0, (new UnsafeEvalAnalyzer())->analyze([$file]));
+    }
+
     public function testUnsafeEvalResolvesIndirectAssertVariable(): void
     {
         $file = $this->tempPhp(
@@ -794,6 +829,16 @@ final class SecurityAnalyzersTest extends TestCase
         $issues = (new UnsafeDeserializationAnalyzer())->analyze([$file]);
 
         self::assertCount(0, $issues);
+    }
+
+    public function testUnsafeDeserializationSkipsTestPaths(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nclass SessionServiceTest {\n    public function hydrate(): void {\n        \$payload = unserialize(\$_GET['data']);\n    }\n}\n",
+            'tests/Unit/SessionServiceTest.php'
+        );
+
+        self::assertCount(0, (new UnsafeDeserializationAnalyzer())->analyze([$file]));
     }
 
     public function testUnsafeDeserializationMatchesCaseInsensitiveFunction(): void

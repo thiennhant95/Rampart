@@ -39,6 +39,19 @@ Full documentation: **[English](https://thiennhant95.github.io/Rampart/en/)** ·
 
 ---
 
+## Project status
+
+- **Stable (1.x)** — CI, dogfood scan and the full test suite run on every push.
+  Pin a release tag in CI and keep a baseline for findings you accept.
+- **Supported versions** — PHP `^8.1`, Laravel 9–13.
+- **Scope** — custom rules are static heuristics over the AST, not a full SAST
+  replacement. Expect false positives/negatives; see the rule tables and
+  remediation in the reports.
+- **Security** — report vulnerabilities privately via `SECURITY.md`; scans read
+  and parse source, they do not execute target code.
+
+---
+
 ## Overview
 
 `quality:check` is a single Artisan command that runs the whole quality pipeline

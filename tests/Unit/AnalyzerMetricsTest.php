@@ -376,6 +376,11 @@ final class AnalyzerMetricsTest extends TestCase
             ['app/Console/PublishCommand.php' => "<?php\ncopy(dirname(__DIR__, 2) . '/resources/stubs/x.stub', \$target);\n"],
             null,
         ];
+        yield 'ssrf_fp_magic_dir_stub' => [
+            static fn (): AbstractAnalyzer => new OwaspSsrfAnalyzer(),
+            ['app/Console/PublishCommand.php' => "<?php\nclass PublishCommand {\n    protected string \$suffix = 'x.stub';\n    public function publish(): void {\n        \$stub = __DIR__ . \"/resources/stubs/{\$this->suffix}\";\n        copy(\$stub, 'out');\n    }\n}\n"],
+            null,
+        ];
         yield 'ssrf_fp_readdir_listing' => [
             static fn (): AbstractAnalyzer => new OwaspSsrfAnalyzer(),
             ['app/Services/ThemeService.php' => "<?php\nclass ThemeService {\n    public function scan(): void {\n        if (\$handle = opendir('themes')) {\n            while (false !== (\$entry = readdir(\$handle))) {\n                \$text = file_get_contents('themes/' . \$entry . '/readme.md');\n            }\n        }\n    }\n}\n"],
