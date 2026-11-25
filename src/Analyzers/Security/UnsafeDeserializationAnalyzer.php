@@ -50,20 +50,22 @@ final class UnsafeDeserializationAnalyzer implements ScanContextAware
 
         $calls = $finder->findInstanceOf($ast, Node\Expr\FuncCall::class);
         foreach ($calls as $call) {
-            if (!$call->name instanceof Node\Name) {
+            $target = $this->resolveFunctionName($call, $finder, $ast);
+            if ($target === null) {
                 continue;
             }
-            $functionName = $call->name->toString();
+            $functionName = $target['name'];
+            $dataIndex = $target['data_index'];
 
             if ($functionName === 'unserialize') {
-                $arg = $call->args[0] ?? null;
-                if ($arg === null) {
+                $arg = $call->args[$dataIndex] ?? null;
+                if (!$arg instanceof Node\Arg) {
                     continue;
                 }
                 if ($this->isLiteralOrConstant($arg->value)) {
                     continue;
                 }
-                if ($this->disallowsClasses($call)) {
+                if ($this->disallowsClasses($call, $dataIndex)) {
                     continue;
                 }
                 $issues[] = new Issue(
@@ -78,11 +80,11 @@ final class UnsafeDeserializationAnalyzer implements ScanContextAware
             }
 
             if (in_array($functionName, ['yaml_parse', 'yaml_parse_file', 'yaml_parse_url'], true)) {
-                $arg = $call->args[0] ?? null;
-                if ($arg === null) {
+                $arg = $call->args[$dataIndex] ?? null;
+                if (!$arg instanceof Node\Arg) {
                     continue;
                 }
-                if ($arg instanceof Node\Arg && $this->isLiteralOrConstant($arg->value)) {
+                if ($this->isLiteralOrConstant($arg->value)) {
                     continue;
                 }
                 $issues[] = new Issue(
@@ -97,11 +99,11 @@ final class UnsafeDeserializationAnalyzer implements ScanContextAware
             }
 
             if ($functionName === 'ini_set' || $functionName === 'set_error_handler') {
-                $arg = $call->args[0] ?? null;
-                $arg2 = $call->args[1] ?? null;
+                $arg = $call->args[$dataIndex] ?? null;
+                $arg2 = $call->args[$dataIndex + 1] ?? null;
                 $argName = $arg instanceof Node\Arg ? $this->argLiteralString($arg->value) : null;
-                if ($argName === 'unserialize_callback_func') {
-                    if ($arg2 === null || $this->isLiteralOrConstant($arg2->value)) {
+                if ($argName !== null && strtolower($argName) === 'unserialize_callback_func') {
+                    if (!$arg2 instanceof Node\Arg || $this->isLiteralOrConstant($arg2->value)) {
                         continue;
                     }
                     $issues[] = new Issue(
@@ -120,6 +122,44 @@ final class UnsafeDeserializationAnalyzer implements ScanContextAware
         return $issues;
     }
 
+    /**
+     * Direct calls, simple `$f = 'unserialize'; $f(...)` calls, and
+     * call_user_func('unserialize', ...) wrappers all resolve to the same
+     * normalized function name. data_index points at the first argument the
+     * target function treats as data.
+     *
+     * @param list<Node> $nodes
+     * @return array{name: string, data_index: int}|null
+     */
+    private function resolveFunctionName(
+        Node\Expr\FuncCall $call,
+        CountingNodeFinder $finder,
+        array $nodes
+    ): ?array {
+        if ($call->name instanceof Node\Name) {
+            $name = strtolower($call->name->toString());
+            if ($name === 'call_user_func' && isset($call->args[0]) && $call->args[0] instanceof Node\Arg) {
+                $first = $call->args[0];
+                $resolved = LocalStringResolver::resolve($first->value, $call, $finder, $nodes);
+
+                return $resolved !== null
+                    ? ['name' => strtolower($resolved), 'data_index' => 1]
+                    : ['name' => $name, 'data_index' => 0];
+            }
+
+            return ['name' => $name, 'data_index' => 0];
+        }
+        if (!$call->name instanceof Node\Expr\Variable) {
+            return null;
+        }
+        $resolved = LocalStringResolver::resolve($call->name, $call, $finder, $nodes);
+        if ($resolved === null) {
+            return null;
+        }
+
+        return ['name' => strtolower($resolved), 'data_index' => 0];
+    }
+
     private function isLiteralOrConstant(Node\Expr $expr): bool
     {
         return $expr instanceof Node\Scalar
@@ -131,9 +171,9 @@ final class UnsafeDeserializationAnalyzer implements ScanContextAware
      * unserialize($data, ['allowed_classes' => false]) cannot instantiate
      * objects — the object-injection vector is closed.
      */
-    private function disallowsClasses(Node\Expr\FuncCall $call): bool
+    private function disallowsClasses(Node\Expr\FuncCall $call, int $dataIndex = 0): bool
     {
-        $options = $call->args[1] ?? null;
+        $options = $call->args[$dataIndex + 1] ?? null;
         if (!$options instanceof Node\Arg || !$options->value instanceof Node\Expr\Array_) {
             return false;
         }

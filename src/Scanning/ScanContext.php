@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rampart\QualityChecker\Scanning;
 
+use PhpParser\ErrorHandler\Collecting;
 use PhpParser\Node;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\ParentConnectingVisitor;
@@ -125,8 +126,9 @@ final class ScanContext
         }
         Profiler::countParse($path);
         $parseStart = microtime(true);
+        $errors = new Collecting();
         try {
-            $parsed = $this->parser()->parse($entry->source);
+            $parsed = $this->parser()->parse($entry->source, $errors);
         } catch (\Throwable $e) {
             $parsed = null;
         }
@@ -136,6 +138,11 @@ final class ScanContext
             Profiler::add('canonical-parse', microtime(true) - $parseStart);
 
             return null;
+        }
+        if ($errors->hasErrors()) {
+            // Recovery keeps the nodes parsed around a syntax error: one bad
+            // expression must not hide valid sinks elsewhere in the file.
+            ++$this->parseFailures;
         }
         $nodes = [];
         foreach ($parsed as $node) {

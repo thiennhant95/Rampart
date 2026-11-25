@@ -159,6 +159,27 @@ final class SecurityAnalyzersTest extends TestCase
         self::assertCount(0, $issues);
     }
 
+    public function testObfuscatedReportsPayloadLine(): void
+    {
+        $file = $this->tempPhp("<?php\n\n// one\n// two\n// three\neval(base64_decode(\$payload));\n");
+        $issues = (new ObfuscatedAnalyzer())->analyze([$file]);
+        self::assertCount(1, $issues);
+        self::assertSame(6, $issues[0]->line);
+    }
+
+    public function testObfuscatedFlagsDecodeFamilyAndMalformedEval(): void
+    {
+        $base85 = $this->tempPhp("<?php\neval(base85_decode(\$payload));\n");
+        $rot = $this->tempPhp("<?php\neval(str_rot14(\$payload));\n");
+        $bracket = $this->tempPhp("<?php\neval[base64_decode(\$payload)];\n");
+
+        foreach ([$base85, $rot, $bracket] as $file) {
+            $issues = (new ObfuscatedAnalyzer())->analyze([$file]);
+            self::assertCount(1, $issues);
+            self::assertTrue($this->ruleMatches($issues[0], 'OBFUSCATED_PHP', Severity::Critical));
+        }
+    }
+
     /** UnsafeEvalAnalyzer */
 
     public function testUnsafeEvalFlagsRequestInput(): void
@@ -309,6 +330,43 @@ final class SecurityAnalyzersTest extends TestCase
         self::assertTrue($this->ruleMatches($issues[0], 'UNSAFE_EVAL', Severity::Critical));
     }
 
+    public function testUnsafeEvalResolvesIndirectAssertVariable(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Services;\nclass Runner {\n    public function run(string \$code): void {\n        \$fn = 'assert';\n        \$fn(\$code);\n    }\n}\n",
+            'app/Services/Runner.php'
+        );
+
+        $issues = (new UnsafeEvalAnalyzer())->analyze([$file]);
+
+        self::assertNotEmpty($issues);
+        self::assertTrue($this->ruleMatches($issues[0], 'UNSAFE_EVAL', Severity::Critical));
+    }
+
+    public function testUnsafeEvalFlagsCallUserFuncWithLiteralAssertTarget(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Services;\nuse Illuminate\\Http\\Request;\nclass Runner {\n    public function run(Request \$request): void {\n        call_user_func('assert', \$request->input('code'));\n    }\n}\n",
+            'app/Services/Runner.php'
+        );
+
+        $issues = (new UnsafeEvalAnalyzer())->analyze([$file]);
+
+        self::assertNotEmpty($issues);
+        self::assertTrue($this->ruleMatches($issues[0], 'UNSAFE_EVAL', Severity::Critical));
+        self::assertSame('assert', $issues[0]->metadata['function']);
+    }
+
+    public function testUnsafeEvalSkipsCallUserFuncWithLiteralSafeTarget(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Services;\nuse Illuminate\\Http\\Request;\nclass Runner {\n    public function run(Request \$request): void {\n        call_user_func('strlen', \$request->input('value'));\n    }\n}\n",
+            'app/Services/Runner.php'
+        );
+
+        self::assertCount(0, (new UnsafeEvalAnalyzer())->analyze([$file]));
+    }
+
     /** HardcodedSecretAnalyzer */
 
     public function testHardcodedSecretFlagsOpenAiKey(): void
@@ -437,6 +495,25 @@ final class SecurityAnalyzersTest extends TestCase
         $controller = $this->tempPhp(
             "<?php\nnamespace App\\Http\\Controllers;\nuse App\\Models\\Order;\nuse Illuminate\\Http\\Request;\n" .
             "class OrderController {\n    public function store(Request \$request) {\n        return Order::create(\$request->all());\n    }\n}\n",
+            'app/Http/Controllers/OrderController.php'
+        );
+        $model = $this->tempPhp(
+            "<?php\nnamespace App\\Models;\nclass Order extends \\Illuminate\\Database\\Eloquent\\Model {\n    protected \$guarded = [];\n}\n",
+            'app/Models/Order.php'
+        );
+
+        $issues = (new MassAssignmentAnalyzer())->analyze([$controller, $model]);
+
+        self::assertNotEmpty($issues);
+        self::assertTrue($this->ruleMatches($issues[0], 'MASS_ASSIGNMENT', Severity::Error));
+    }
+
+    public function testMassAssignmentKeepsValidSinkNextToSyntaxError(): void
+    {
+        $controller = $this->tempPhp(
+            "<?php\nnamespace App\\Http\\Controllers;\nuse App\\Models\\Order;\nuse Illuminate\\Http\\Request;\n" .
+            "class OrderController {\n    public function store(Request \$request) {\n" .
+            "        Order::create(\$request->all());\n        undeclared_fn(1,,2);\n    }\n}\n",
             'app/Http/Controllers/OrderController.php'
         );
         $model = $this->tempPhp(
@@ -717,6 +794,45 @@ final class SecurityAnalyzersTest extends TestCase
         $issues = (new UnsafeDeserializationAnalyzer())->analyze([$file]);
 
         self::assertCount(0, $issues);
+    }
+
+    public function testUnsafeDeserializationMatchesCaseInsensitiveFunction(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Services;\nuse Illuminate\\Http\\Request;\nclass SessionService {\n    public function hydrate(Request \$request): void {\n        \$payload = UNSERIALIZE(\$request->input('data'));\n    }\n}\n",
+            'app/Services/SessionService.php'
+        );
+
+        $issues = (new UnsafeDeserializationAnalyzer())->analyze([$file]);
+
+        self::assertNotEmpty($issues);
+        self::assertTrue($this->ruleMatches($issues[0], 'UNSAFE_UNSERIALIZE', Severity::Critical));
+    }
+
+    public function testUnsafeDeserializationResolvesIndirectVariable(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Services;\nuse Illuminate\\Http\\Request;\nclass SessionService {\n    public function hydrate(Request \$request): void {\n        \$fn = 'unserialize';\n        \$payload = \$fn(\$request->input('data'));\n    }\n}\n",
+            'app/Services/SessionService.php'
+        );
+
+        $issues = (new UnsafeDeserializationAnalyzer())->analyze([$file]);
+
+        self::assertNotEmpty($issues);
+        self::assertTrue($this->ruleMatches($issues[0], 'UNSAFE_UNSERIALIZE', Severity::Critical));
+    }
+
+    public function testUnsafeDeserializationResolvesCallUserFuncWrapper(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Services;\nuse Illuminate\\Http\\Request;\nclass SessionService {\n    public function hydrate(Request \$request): void {\n        \$payload = call_user_func('unserialize', \$request->input('data'));\n    }\n}\n",
+            'app/Services/SessionService.php'
+        );
+
+        $issues = (new UnsafeDeserializationAnalyzer())->analyze([$file]);
+
+        self::assertNotEmpty($issues);
+        self::assertTrue($this->ruleMatches($issues[0], 'UNSAFE_UNSERIALIZE', Severity::Critical));
     }
 
     /** InsecureHashAnalyzer */

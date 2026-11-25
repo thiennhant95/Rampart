@@ -58,11 +58,16 @@ final class UnsafeEvalAnalyzer extends AbstractAnalyzer
         $evals = $this->finder()->findInstanceOf($nodes, Node\Expr\Eval_::class);
 
         foreach ($calls as $call) {
-            if (!$call->name instanceof Node\Name) {
+            $name = $this->resolveFunctionName($call, $nodes);
+            if ($name === null) {
                 continue;
             }
 
-            $name = strtolower($call->name->toString());
+            if (in_array($name, ['call_user_func', 'call_user_func_array'], true)) {
+                $this->checkCallUserFunc($call, $name, $nodes, $file, $issues);
+                continue;
+            }
+
             if (!in_array($name, self::FUNCTIONS, true)) {
                 continue;
             }
@@ -79,16 +84,6 @@ final class UnsafeEvalAnalyzer extends AbstractAnalyzer
             // comparisons, empty()/isset(), is_*/has_* checks, boolean
             // operators) cannot carry code — there is nothing to evaluate.
             if ($name === 'assert' && $this->isBooleanExpression($firstArg)) {
-                continue;
-            }
-            // call_user_func([$this, 'handle'], $userInput) passes user data
-            // as an argument to a fixed method — the callable itself is not
-            // attacker-controlled, so this is not code injection. Only the
-            // callable position (first arg) matters.
-            if (
-                in_array($name, ['call_user_func', 'call_user_func_array'], true)
-                && $this->isFixedCallable($firstArg)
-            ) {
                 continue;
             }
             if ($this->isValidatedExpression($firstArg, $call, $nodes)) {
@@ -125,6 +120,112 @@ final class UnsafeEvalAnalyzer extends AbstractAnalyzer
         }
 
         return $issues;
+    }
+
+    /**
+     * Direct calls and simple `$f = 'assert'; $f(...)` / `$f = 'strlen';
+     * $f(...)` indirection resolve to the same normalized name.
+     *
+     * @param list<Node> $nodes
+     */
+    private function resolveFunctionName(Node\Expr\FuncCall $call, array $nodes): ?string
+    {
+        if ($call->name instanceof Node\Name) {
+            return strtolower($call->name->toString());
+        }
+        if (!$call->name instanceof Node\Expr\Variable) {
+            return null;
+        }
+        $resolved = LocalStringResolver::resolve($call->name, $call, $this->finder(), $nodes);
+
+        return $resolved !== null ? strtolower($resolved) : null;
+    }
+
+    /**
+     * call_user_func('assert', $code) hides the dangerous target in an
+     * argument, so the first argument is the callable and the code argument
+     * is the one after it. Unresolved callables keep the old conservative
+     * behaviour (a non-literal callable is reportable).
+     *
+     * @param list<Node> $nodes
+     * @param list<Issue> $issues
+     */
+    private function checkCallUserFunc(
+        Node\Expr\FuncCall $call,
+        string $name,
+        array $nodes,
+        string $file,
+        array &$issues
+    ): void {
+        if (count($call->args) === 0) {
+            return;
+        }
+
+        $firstArg = $call->args[0]->value;
+        $target = LocalStringResolver::resolve($firstArg, $call, $this->finder(), $nodes);
+        if ($target === null) {
+            if (
+                $this->isStaticValue($firstArg)
+                || $this->isFixedCallable($firstArg)
+                || $this->isValidatedExpression($firstArg, $call, $nodes)
+            ) {
+                return;
+            }
+            $issues[] = $this->makeIssue(
+                self::RULE,
+                sprintf('%s() is called with non-literal input; this can lead to arbitrary code execution.', $name),
+                $file,
+                $call->getStartLine(),
+                Severity::Critical,
+                ['function' => $name]
+            );
+
+            return;
+        }
+
+        $target = strtolower($target);
+        if (!in_array($target, ['assert', 'create_function'], true)) {
+            return;
+        }
+
+        $codeIndex = $target === 'create_function' ? 2 : 1;
+        $codeArg = $call->args[$codeIndex] ?? null;
+        if (!$codeArg instanceof Node\Arg) {
+            return;
+        }
+        $code = $codeArg->value;
+        if ($this->isStaticValue($code)) {
+            return;
+        }
+        if ($target === 'assert' && $this->isBooleanExpression($code)) {
+            return;
+        }
+        if ($name === 'call_user_func_array' && $code instanceof Node\Expr\Array_ && $this->isStaticArray($code)) {
+            return;
+        }
+        if ($this->isValidatedExpression($code, $call, $nodes)) {
+            return;
+        }
+
+        $issues[] = $this->makeIssue(
+            self::RULE,
+            sprintf('%s() is called via %s() with non-literal input; this can lead to arbitrary code execution.', $target, $name),
+            $file,
+            $call->getStartLine(),
+            Severity::Critical,
+            ['function' => $target, 'via' => $name]
+        );
+    }
+
+    private function isStaticArray(Node\Expr\Array_ $array): bool
+    {
+        foreach ($array->items as $item) {
+            if (!$item instanceof Node\Expr\ArrayItem || $item->unpack || !$this->isStaticValue($item->value)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function isStaticValue(Node\Expr $expr): bool

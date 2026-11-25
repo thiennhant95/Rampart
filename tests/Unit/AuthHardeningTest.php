@@ -231,4 +231,101 @@ final class AuthHardeningTest extends TestCase
 
         self::assertCount(0, $issues);
     }
+
+    public function testWeakPasswordPolicyChecksBothTernaryBranches(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Http\\Requests;\n" .
+            "class RegisterRequest extends \\Illuminate\\Foundation\\Http\\FormRequest {\n" .
+            "    public function rules(): array {\n" .
+            "        return ['password' => \$this->strong ? 'required|min:12' : 'required|min:4'];\n" .
+            "    }\n}\n",
+            'app/Http/Requests/RegisterRequest.php'
+        );
+
+        $issues = $this->onlyRule((new AuthHardeningAnalyzer())->analyze([$file]), 'WEAK_PASSWORD_POLICY');
+
+        self::assertNotEmpty($issues);
+        self::assertStringContainsString('minimum length 4', $issues[0]->message);
+    }
+
+    public function testWeakPasswordPolicyIgnoresDeadWeakBranch(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Http\\Requests;\n" .
+            "class RegisterRequest extends \\Illuminate\\Foundation\\Http\\FormRequest {\n" .
+            "    public function rules(): array {\n" .
+            "        return ['password' => false ? 'required|min:4' : 'required|min:12'];\n" .
+            "    }\n}\n",
+            'app/Http/Requests/RegisterRequest.php'
+        );
+
+        self::assertCount(0, $this->onlyRule((new AuthHardeningAnalyzer())->analyze([$file]), 'WEAK_PASSWORD_POLICY'));
+    }
+
+    public function testWeakPasswordPolicyResolvesConcatenatedLiteralVariable(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Http\\Requests;\n" .
+            "class RegisterRequest extends \\Illuminate\\Foundation\\Http\\FormRequest {\n" .
+            "    public function rules(): array {\n" .
+            "        \$n = 4;\n" .
+            "        return ['password' => 'required|min:' . \$n];\n" .
+            "    }\n}\n",
+            'app/Http/Requests/RegisterRequest.php'
+        );
+
+        $issues = $this->onlyRule((new AuthHardeningAnalyzer())->analyze([$file]), 'WEAK_PASSWORD_POLICY');
+
+        self::assertNotEmpty($issues);
+        self::assertStringContainsString('minimum length 4', $issues[0]->message);
+    }
+
+    public function testWeakPasswordPolicyDoesNotTrustLiteralRuleBesideDynamicOne(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Http\\Requests;\n" .
+            "class RegisterRequest extends \\Illuminate\\Foundation\\Http\\FormRequest {\n" .
+            "    public function rules(): array {\n" .
+            "        return ['password' => ['required', 'min:12', \$this->extraRule]];\n" .
+            "    }\n}\n",
+            'app/Http/Requests/RegisterRequest.php'
+        );
+
+        $issues = $this->onlyRule((new AuthHardeningAnalyzer())->analyze([$file]), 'WEAK_PASSWORD_POLICY');
+
+        self::assertNotEmpty($issues);
+        self::assertStringContainsString('cannot be verified', $issues[0]->message);
+    }
+
+    public function testWeakPasswordPolicySilentForStrongFluentChain(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Http\\Requests;\nuse Illuminate\\Validation\\Rules\\Password;\n" .
+            "class RegisterRequest extends \\Illuminate\\Foundation\\Http\\FormRequest {\n" .
+            "    public function rules(): array {\n" .
+            "        return ['password' => Password::min(12)->mixedCase()->numbers()];\n" .
+            "    }\n}\n",
+            'app/Http/Requests/RegisterRequest.php'
+        );
+
+        self::assertCount(0, $this->onlyRule((new AuthHardeningAnalyzer())->analyze([$file]), 'WEAK_PASSWORD_POLICY'));
+    }
+
+    public function testWeakPasswordPolicyFlagsShortFluentChainOnce(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Http\\Requests;\nuse Illuminate\\Validation\\Rules\\Password;\n" .
+            "class RegisterRequest extends \\Illuminate\\Foundation\\Http\\FormRequest {\n" .
+            "    public function rules(): array {\n" .
+            "        return ['password' => Password::min(4)->mixedCase()];\n" .
+            "    }\n}\n",
+            'app/Http/Requests/RegisterRequest.php'
+        );
+
+        $issues = $this->onlyRule((new AuthHardeningAnalyzer())->analyze([$file]), 'WEAK_PASSWORD_POLICY');
+
+        self::assertCount(1, $issues);
+        self::assertStringContainsString('Password::min(4)', $issues[0]->message);
+    }
 }

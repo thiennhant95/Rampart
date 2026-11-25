@@ -43,7 +43,7 @@ final class ObfuscatedAnalyzer implements ScanContextAware
                 self::RULE,
                 sprintf('Obfuscated PHP detected: %s.', $match['label']),
                 $file,
-                1,
+                $match['line'],
                 Severity::Critical,
                 'custom',
                 ['pattern' => $match['pattern']],

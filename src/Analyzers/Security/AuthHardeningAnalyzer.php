@@ -225,7 +225,7 @@ final class AuthHardeningAnalyzer implements ScanContextAware
                 if (preg_match('/passw/i', $item->key->value) !== 1) {
                     continue;
                 }
-                $finding = $this->weakPasswordRuleValue($item->value);
+                $finding = $this->weakPasswordRuleValue($item->value, $item, $finder, $ast);
                 if ($finding === null) {
                     continue;
                 }
@@ -371,60 +371,166 @@ final class AuthHardeningAnalyzer implements ScanContextAware
 
     /**
      * Describe why a password rule value is weak, or null when it is fine.
-     * String rules are split on '|' and each segment is checked for
-     * ^min:(\d+); arrays of string rules must contain a min: rule meeting
-     * the floor. Non-string rule values (rule objects such as
-     * Password::min(8)) are out of scope here.
+     *
+     * Literal strings/concat/int variables resolve to `min:N` segments.
+     * A ternary is evaluated per branch: a constant condition picks the live
+     * branch, otherwise both branches are checked (a weak branch is weak).
+     * Arrays with an unresolvable element are reported as unverifiable instead
+     * of silently trusting the other literal rules.
+     *
+     * @param list<Node> $ast
      */
-    private function weakPasswordRuleValue(?Node\Expr $value): ?string
-    {
-        if ($value instanceof Node\Scalar\String_) {
-            $hasMin = false;
-            foreach (explode('|', $value->value) as $segment) {
-                $segment = trim($segment);
-                if (preg_match('/^min:(\d+)/', $segment, $matches) !== 1) {
-                    continue;
-                }
-                $hasMin = true;
-                if ((int) $matches[1] < self::MIN_PASSWORD_LENGTH) {
-                    return sprintf('minimum length %d is below the minimum; ', (int) $matches[1]);
-                }
-            }
-            if (!$hasMin) {
-                return 'no minimum length rule is defined; ';
-            }
-
+    private function weakPasswordRuleValue(
+        ?Node\Expr $value,
+        Node $context,
+        CountingNodeFinder $finder,
+        array $ast
+    ): ?string {
+        if ($value === null) {
+            return 'no minimum length rule is defined; ';
+        }
+        // Password::min(N) (including fluent chains) is reported by the
+        // dedicated StaticCall pass; returning here avoids duplicate findings
+        // and does not treat the chain as an unverifiable dynamic rule.
+        if ($this->hasPasswordMinStaticCall($value)) {
             return null;
         }
+        if ($value instanceof Node\Expr\Ternary) {
+            $truth = $this->constantBool($value->cond);
+            if ($truth === true) {
+                return $this->weakPasswordRuleValue($value->if, $context, $finder, $ast);
+            }
+            if ($truth === false) {
+                return $this->weakPasswordRuleValue($value->else, $context, $finder, $ast);
+            }
+            $if = $this->weakPasswordRuleValue($value->if, $context, $finder, $ast);
+            $else = $this->weakPasswordRuleValue($value->else, $context, $finder, $ast);
 
+            return $if ?? $else;
+        }
+
+        if ($value instanceof Node\Expr\StaticCall) {
+            $length = $this->weakPasswordMinLength($value);
+
+            return $length !== null && $length < self::MIN_PASSWORD_LENGTH
+                ? sprintf('minimum length %d is below the minimum; ', $length)
+                : null;
+        }
+
+        $segments = [];
+        $dynamic = false;
         if ($value instanceof Node\Expr\Array_) {
-            $segments = [];
             foreach ($value->items as $item) {
                 if (!$item instanceof Node\Expr\ArrayItem || $item->unpack) {
-                    return null;
+                    $dynamic = true;
+                    continue;
                 }
-                if (!$item->value instanceof Node\Scalar\String_) {
-                    return null;
+                if ($item->value instanceof Node\Expr\StaticCall) {
+                    // Password::min(N) is handled by the dedicated pass.
+                    continue;
                 }
-                foreach (explode('|', $item->value->value) as $segment) {
+                $literal = $this->constantString($item->value, $context, $finder, $ast);
+                if ($literal === null) {
+                    $dynamic = true;
+                    continue;
+                }
+                foreach (explode('|', $literal) as $segment) {
                     $segments[] = trim($segment);
                 }
             }
-            $hasMin = false;
-            foreach ($segments as $segment) {
-                if (preg_match('/^min:(\d+)/', $segment, $matches) !== 1) {
-                    continue;
-                }
-                $hasMin = true;
-                if ((int) $matches[1] < self::MIN_PASSWORD_LENGTH) {
-                    return sprintf('minimum length %d is below the minimum; ', (int) $matches[1]);
-                }
+        } else {
+            $literal = $this->constantString($value, $context, $finder, $ast);
+            if ($literal === null) {
+                return null;
             }
-            if (!$hasMin) {
-                return 'no minimum length rule is defined; ';
+            foreach (explode('|', $literal) as $segment) {
+                $segments[] = trim($segment);
             }
+        }
 
-            return null;
+        $hasMin = false;
+        foreach ($segments as $segment) {
+            if (preg_match('/^min:(\d+)/', $segment, $matches) !== 1) {
+                continue;
+            }
+            $hasMin = true;
+            if ((int) $matches[1] < self::MIN_PASSWORD_LENGTH) {
+                return sprintf('minimum length %d is below the minimum; ', (int) $matches[1]);
+            }
+        }
+        if ($dynamic) {
+            return 'a dynamic rule component means the minimum length cannot be verified; ';
+        }
+        if (!$hasMin) {
+            return 'no minimum length rule is defined; ';
+        }
+
+        return null;
+    }
+
+    private function hasPasswordMinStaticCall(Node\Expr $value): bool
+    {
+        if ($value instanceof Node\Expr\StaticCall) {
+            if (!$value->class instanceof Node\Name || !$value->name instanceof Node\Identifier) {
+                return false;
+            }
+            $parts = explode('\\', strtolower($value->class->toString()));
+
+            return end($parts) === 'password' && strtolower($value->name->toString()) === 'min';
+        }
+        if ($value instanceof Node\Expr\MethodCall && $value->name instanceof Node\Identifier) {
+            return $this->hasPasswordMinStaticCall($value->var);
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<Node> $ast
+     */
+    private function constantString(
+        Node\Expr $value,
+        Node $context,
+        CountingNodeFinder $finder,
+        array $ast
+    ): ?string {
+        if ($value instanceof Node\Scalar\String_) {
+            return $value->value;
+        }
+        if ($value instanceof Node\Scalar\LNumber) {
+            return (string) $value->value;
+        }
+        if ($value instanceof Node\Expr\BinaryOp\Concat) {
+            $left = $this->constantString($value->left, $context, $finder, $ast);
+            $right = $this->constantString($value->right, $context, $finder, $ast);
+
+            return $left !== null && $right !== null ? $left . $right : null;
+        }
+        if ($value instanceof Node\Expr\Variable) {
+            return LocalStringResolver::resolve($value, $context, $finder, $ast);
+        }
+
+        return null;
+    }
+
+    private function constantBool(Node\Expr $value): ?bool
+    {
+        if ($value instanceof Node\Expr\ConstFetch) {
+            $name = strtolower($value->name->toString());
+            if ($name === 'true') {
+                return true;
+            }
+            if ($name === 'false' || $name === 'null') {
+                return false;
+            }
+        }
+        if ($value instanceof Node\Scalar\LNumber || $value instanceof Node\Scalar\DNumber) {
+            return $value->value != 0;
+        }
+        if ($value instanceof Node\Expr\BooleanNot) {
+            $inner = $this->constantBool($value->expr);
+
+            return $inner !== null ? !$inner : null;
         }
 
         return null;
