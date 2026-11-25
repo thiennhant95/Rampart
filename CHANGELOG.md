@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-11-25
+
+### Fixed
+
+- Security and OWASP analyzers skip test paths by default, so fixture files
+  are not reported as production sinks.
+- `OWASP_SSRF` no longer flags paths rooted at `__DIR__`/`__FILE__`/`dirname()`.
+- `call_user_func` callables guarded by `is_callable()` or
+  `instanceof \Closure` in the same function are treated as internally
+  registered.
+
+### Changed
+
+- The standalone CLI raises the PHP memory floor to 512M for large
+  repositories.
+- README now documents project status, supported versions and scope.
+
 ## [1.7.1] - 2026-11-25
 
 ### Fixed
