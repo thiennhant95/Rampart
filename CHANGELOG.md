@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.3] - 2026-11-25
+
+### Fixed
+
+- `INSECURE_HASH` now flags `random_int()` with a tiny literal range in a
+  token/OTP context (e.g. `random_int(0, 9)`), while large OTP ranges stay
+  silent.
+- `INSECURE_HASH` recognises `hash_hmac()` with weak algorithms and
+  non-cryptographic checksums (`crc32`, `crc32b`, `adler32`) in credential
+  context.
+
 ## [1.7.2] - 2026-11-25
 
 ### Fixed
