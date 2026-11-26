@@ -982,6 +982,43 @@ final class SecurityAnalyzersTest extends TestCase
         self::assertCount(0, $issues);
     }
 
+    public function testInsecureHashFlagsSmallRandomIntRangeForOtp(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Services;\nclass OtpService {\n    public function generate(): int {\n        \$otp = random_int(0, 9);\n        return \$otp;\n    }\n}\n",
+            'app/Services/OtpService.php'
+        );
+
+        $issues = (new InsecureHashAnalyzer())->analyze([$file]);
+
+        self::assertNotEmpty($issues);
+        self::assertTrue($this->ruleMatches($issues[0], 'INSECURE_HASH', Severity::Warning));
+        self::assertStringContainsString('10 possible values', $issues[0]->message);
+    }
+
+    public function testInsecureHashSkipsSmallRandomIntOutsideTokenContext(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Services;\nclass PaginationService {\n    public function page(): int {\n        \$index = random_int(0, 9);\n        return \$index;\n    }\n}\n",
+            'app/Services/PaginationService.php'
+        );
+
+        self::assertCount(0, (new InsecureHashAnalyzer())->analyze([$file]));
+    }
+
+    public function testInsecureHashFlagsHashHmacWeakAlgorithmForPassword(): void
+    {
+        $file = $this->tempPhp(
+            "<?php\nnamespace App\\Services;\nclass PasswordService {\n    public function fingerprint(string \$password): string {\n        return hash_hmac('md5', \$password, 'key');\n    }\n}\n",
+            'app/Services/PasswordService.php'
+        );
+
+        $issues = (new InsecureHashAnalyzer())->analyze([$file]);
+
+        self::assertNotEmpty($issues);
+        self::assertTrue($this->ruleMatches($issues[0], 'INSECURE_HASH', Severity::Warning));
+    }
+
     public function testInsecureHashSkipsHibpKAnonymity(): void
     {
         $file = $this->tempPhp(

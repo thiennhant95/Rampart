@@ -356,6 +356,11 @@ final class AnalyzerMetricsTest extends TestCase
             ['app/Services/ExternalService.php' => "<?php\n\$lines = file(\$path);\n"],
             null,
         ];
+        yield 'ssrf_fp_storage_path' => [
+            static fn (): AbstractAnalyzer => new OwaspSsrfAnalyzer(),
+            ['app/Services/FileService.php' => "<?php\n\$contents = file_get_contents(storage_path('app/report.txt'));\n"],
+            null,
+        ];
         yield 'ssrf_tp_fsockopen_host' => [
             static fn (): AbstractAnalyzer => new OwaspSsrfAnalyzer(),
             ['app/Services/ExternalService.php' => "<?php\n\$fp = fsockopen(\$host, 80);\n"],

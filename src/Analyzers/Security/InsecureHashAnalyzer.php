@@ -20,7 +20,13 @@ final class InsecureHashAnalyzer implements ScanContextAware
 
     private const WEAK_FUNCTIONS = ['md5', 'sha1'];
 
-    private const WEAK_HASH_ALGOS = ['md5', 'sha1', 'md4'];
+    private const WEAK_HASH_ALGOS = ['md5', 'sha1', 'md4', 'crc32', 'crc32b', 'adler32'];
+
+    /**
+     * random_int() is a CSPRNG, but a token/OTP generated from a tiny range
+     * is still guessable (random_int(0, 9) has 10 possibilities).
+     */
+    private const MIN_TOKEN_RANGE = 10000;
 
     /**
      * Not broken hashes but broken randomness: rand()/mt_rand() (Mersenne
@@ -86,26 +92,36 @@ final class InsecureHashAnalyzer implements ScanContextAware
 
             return in_array($name, self::WEAK_FUNCTIONS, true)
                 || in_array($name, self::WEAK_RANDOM_FUNCS, true)
-                || $name === 'hash';
+                || $name === 'random_int'
+                || in_array($name, ['hash', 'hash_hmac'], true);
         });
 
         foreach ($calls as $call) {
             if (!$call instanceof Node\Expr\FuncCall) {
                 continue;
             }
-            if ($this->isWeakRandomCall($call)) {
+            if ($this->isWeakRandomCall($call) || $this->isSmallRangeRandomCall($call)) {
                 if (!$this->isTokenContext($call)) {
                     continue;
                 }
                 $fnName = $call->name instanceof Node\Name ? $call->name->toString() : 'rand';
+                $range = $this->randomRangeSize($call);
                 $issues[] = new Issue(
                     self::RULE,
-                    sprintf('%s() is not cryptographically secure and must not generate tokens/OTPs/secrets; use random_int()/random_bytes().', $fnName),
+                    $range !== null
+                        ? sprintf(
+                            '%s() uses only %d possible values for a token/OTP; use random_bytes() or a larger range.',
+                            $fnName,
+                            $range
+                        )
+                        : sprintf('%s() is not cryptographically secure and must not generate tokens/OTPs/secrets; use random_int()/random_bytes().', $fnName),
                     $file,
                     $call->getStartLine(),
                     Severity::Warning,
                     'custom',
-                    ['function' => $fnName]
+                    $range !== null
+                        ? ['function' => $fnName, 'range' => $range]
+                        : ['function' => $fnName]
                 );
                 continue;
             }
@@ -132,8 +148,7 @@ final class InsecureHashAnalyzer implements ScanContextAware
     }
 
     /**
-     * md5()/sha1() always count; hash() only counts with a weak first
-     * algorithm argument (md5/sha1/md4 literal).
+     * rand()/mt_rand()/uniqid() are predictable randomness sources.
      */
     private function isWeakRandomCall(Node\Expr\FuncCall $call): bool
     {
@@ -142,6 +157,47 @@ final class InsecureHashAnalyzer implements ScanContextAware
         }
 
         return in_array(strtolower($call->name->toString()), self::WEAK_RANDOM_FUNCS, true);
+    }
+
+    private function isSmallRangeRandomCall(Node\Expr\FuncCall $call): bool
+    {
+        if (
+            !$call->name instanceof Node\Name
+            || strtolower($call->name->toString()) !== 'random_int'
+        ) {
+            return false;
+        }
+        $range = $this->randomRangeSize($call);
+
+        return $range !== null && $range < self::MIN_TOKEN_RANGE;
+    }
+
+    private function randomRangeSize(Node\Expr\FuncCall $call): ?int
+    {
+        $minArg = $call->args[0] ?? null;
+        $maxArg = $call->args[1] ?? null;
+        if (!$minArg instanceof Node\Arg || !$maxArg instanceof Node\Arg) {
+            return null;
+        }
+        $min = $this->literalInt($minArg->value);
+        $max = $this->literalInt($maxArg->value);
+        if ($min === null || $max === null || $max < $min) {
+            return null;
+        }
+
+        return $max - $min + 1;
+    }
+
+    private function literalInt(Node\Expr $expr): ?int
+    {
+        if ($expr instanceof Node\Scalar\LNumber) {
+            return $expr->value;
+        }
+        if ($expr instanceof Node\Expr\UnaryMinus && $expr->expr instanceof Node\Scalar\LNumber) {
+            return -$expr->expr->value;
+        }
+
+        return null;
     }
 
     /**
@@ -187,8 +243,8 @@ final class InsecureHashAnalyzer implements ScanContextAware
     }
 
     /**
-     * md5()/sha1() always count; hash() only counts with a weak first
-     * algorithm argument (md5/sha1/md4 literal).
+     * md5()/sha1() always count; hash()/hash_hmac() only count with a weak
+     * first algorithm argument (md5/sha1/md4/checksums).
      */
     private function isWeakHashCall(Node\Expr\FuncCall $call): bool
     {
@@ -199,7 +255,7 @@ final class InsecureHashAnalyzer implements ScanContextAware
         if (in_array($name, self::WEAK_FUNCTIONS, true)) {
             return true;
         }
-        if ($name !== 'hash') {
+        if (!in_array($name, ['hash', 'hash_hmac'], true)) {
             return false;
         }
         $algo = $call->args[0] ?? null;
